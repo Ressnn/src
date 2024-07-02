@@ -88,6 +88,9 @@ function App() {
   const [processingStage, setProcessingStage] = useState('idle');
   const [expectedWord, setExpectedWord] = useState('');
   const [showResults, setShowResults] = useState(false);
+  const [customTrait, setCustomTrait] = useState({ low: "Young", high: "Old" });
+  const [customTraitEmbeddings, setCustomTraitEmbeddings] = useState({});
+  const [customTraitResult, setCustomTraitResult] = useState(null);
 
   const addDebugInfo = (info) => {
     if (DEBUG_MODE) {
@@ -162,6 +165,9 @@ function App() {
           } else if (processingStage === 'big5') {
             addDebugInfo(`Received Big 5 embedding for "${word}"`);
             setBig5Embeddings(prev => ({...prev, [word]: e.data.output}));
+          } else if (processingStage === 'custom') {
+            addDebugInfo(`Received custom trait embedding for "${word}"`);
+            setCustomTraitEmbeddings(prev => ({...prev, [word]: e.data.output}));
           } else if (processingStage === 'names') {
             addDebugInfo(`Received name embedding for "${word}"`);
             setNameEmbeddings(prev => ({...prev, [word]: e.data.output}));
@@ -197,6 +203,14 @@ function App() {
     });
   };
 
+  const processCustomTrait = () => {
+    addDebugInfo(`Processing custom trait: ${customTrait.low} - ${customTrait.high}`);
+    setExpectedWord(customTrait.low);
+    worker.current.postMessage({ word: customTrait.low });
+    setExpectedWord(customTrait.high);
+    worker.current.postMessage({ word: customTrait.high });
+  };
+
   const processNames = () => {
     addDebugInfo(`Processing name basket.`);
     nameBasket.forEach(name => {
@@ -213,9 +227,11 @@ function App() {
     setDisabled(true);
     setNameQualities([]);
     setNamePersonality([]);
+    setCustomTraitResult(null);
     setInputEmbedding(null);
     setQualityEmbeddings({});
     setBig5Embeddings({});
+    setCustomTraitEmbeddings({});
     setNameEmbeddings({});
     setProcessingStage('input');
     setDebugInfo('Starting analysis...');
@@ -240,10 +256,17 @@ function App() {
 
   useEffect(() => {
     if (Object.keys(big5Embeddings).length === big5Traits.length * 2) {
+      setProcessingStage('custom');
+      processCustomTrait();
+    }
+  }, [big5Embeddings]);
+
+  useEffect(() => {
+    if (Object.keys(customTraitEmbeddings).length === 2) {
       setProcessingStage('names');
       processNames();
     }
-  }, [big5Embeddings]);
+  }, [customTraitEmbeddings]);
 
   useEffect(() => {
     if (Object.keys(nameEmbeddings).length === nameBasket.length) {
@@ -304,13 +327,42 @@ function App() {
       });
 
       setNamePersonality(personality);
+
+      // Process custom trait
+      const customTraitStats = nameBasket.reduce((acc, name) => {
+        const lowSim = cosineSimilarity(nameEmbeddings[name], customTraitEmbeddings[customTrait.low]);
+        const highSim = cosineSimilarity(nameEmbeddings[name], customTraitEmbeddings[customTrait.high]);
+        acc.push(highSim / (lowSim + highSim));
+        return acc;
+      }, []);
+
+      const mean = customTraitStats.reduce((sum, val) => sum + val, 0) / customTraitStats.length;
+      const variance = customTraitStats.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / customTraitStats.length;
+      const stdDev = Math.sqrt(variance);
+
+      const lowSim = cosineSimilarity(inputEmbedding, customTraitEmbeddings[customTrait.low]);
+      const highSim = cosineSimilarity(inputEmbedding, customTraitEmbeddings[customTrait.high]);
+      const score = highSim / (lowSim + highSim);
+      const zScore = calculateZScore(score, mean, stdDev);
+
+      setCustomTraitResult({
+        low: customTrait.low,
+        high: customTrait.high,
+        score,
+        zScore,
+        percentile: calculatePercentile(zScore)
+      });
       
       setDisabled(false);
       setProcessingStage('idle');
       setShowResults(true);
       addDebugInfo('Analysis complete');
     }
-  }, [nameEmbeddings, qualityEmbeddings, big5Embeddings, inputEmbedding]);
+  }, [nameEmbeddings, qualityEmbeddings, big5Embeddings, customTraitEmbeddings, inputEmbedding, customTrait]);
+
+  const handleCustomTraitChange = (end, value) => {
+    setCustomTrait(prev => ({ ...prev, [end]: value }));
+  };
 
   return (
     <>
@@ -361,6 +413,36 @@ function App() {
               </div>
             ))}
           </div>
+
+          <h3>Custom Association</h3>
+          <div className='custom-trait-container'>
+            <input 
+              type="text"
+              value={customTrait.low}
+              onChange={e => handleCustomTraitChange('low', e.target.value)}
+              placeholder="Low end trait"
+            />
+            <input 
+              type="text"
+              value={customTrait.high}
+              onChange={e => handleCustomTraitChange('high', e.target.value)}
+              placeholder="High end trait"
+            />
+            <button onClick={analyzeNames} disabled={disabled}>Analyze Custom Trait</button>
+          </div>
+          {customTraitResult && (
+            <div className='personality-card custom-trait-result'>
+              <div className='personality-name'>Custom Trait</div>
+              <div className='personality-scale'>
+                <span className='personality-low'>{customTraitResult.low}</span>
+                <div className='personality-bar'>
+                  <div className='personality-marker' style={{ left: `${customTraitResult.percentile * 100}%` }}></div>
+                </div>
+                <span className='personality-high'>{customTraitResult.high}</span>
+              </div>
+              <div className='personality-percentile'>{(customTraitResult.percentile * 100).toFixed(0)}%</div>
+            </div>
+          )}
         </>
       )}
 
@@ -386,4 +468,5 @@ function App() {
     </>
   )
 }
+
 export default App

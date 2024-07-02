@@ -148,9 +148,12 @@
 
 button {
   margin-top: 20px;
-  padding: 10px 20px;
-  font-size: 16px;
+  padding: 12px 25px;
+  font-size: 18px;
   cursor: pointer;
+  border: none;
+  border-radius: 25px;
+  transition: background-color 0.3s ease;
 }
 
 .debug-container {
@@ -182,4 +185,36 @@ h3 {
   font-size: 1.8em;
   margin-top: 30px;
   margin-bottom: 15px;
+}
+
+/* New styles for custom trait section */
+.custom-trait-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.custom-trait-container input {
+  padding: 10px 15px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 25px;
+  outline: none;
+  transition: border-color 0.3s ease;
+  width: 150px;
+}
+
+.custom-trait-container input:focus {
+  border-color: #007bff;
+}
+
+.custom-trait-container button {
+  margin-top: 0;
+}
+
+.custom-trait-result {
+  margin-top: 20px;
 }
