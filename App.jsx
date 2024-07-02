@@ -315,7 +315,7 @@ function App() {
   return (
     <>
       <h1>Name Analysis AI</h1>
-      <h2>Discover the qualities and personality traits associated with names</h2>
+      <h2>Discover character and personality traits associated with names</h2>
 
       <div className='container'>
         <div className='textbox-container'>
@@ -391,4 +391,5 @@ function App() {
     </>
   )
 }
+
 export default App
